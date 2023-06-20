@@ -81,8 +81,9 @@ const start = () => {
 
         const wordCount = text.trim().split(/\s+/).length;
         const charCount = text.replace(/\s/g, '').length;
+        const languageCode = msg.from.language_code;
 
-        return bot.sendMessage(chatId, `Количество символов с пробелами: ${charCount}, количество слов: ${wordCount}`);
+        return bot.sendMessage(chatId, `Количество символов с пробелами: ${charCount}, количество слов: ${wordCount}. Язык текста: ${languageCode}`);
     });
 }
 
