@@ -1,6 +1,8 @@
 const TelegramApi = require('node-telegram-bot-api')
 const token = '6244574892:AAERTiaQsqs8zPdkd95Q45v_nADqZ_1q2IM'
 const {gameOptions, againOptions} = require('./options')
+const fs = require("fs");
+const axios = require("axios");
 
 const bot = new TelegramApi(token, {polling: true})
 const chats = {}
@@ -17,6 +19,7 @@ const start = () => {
         {command: '/start', description: 'Начальное приветствие'},
         {command: '/info', description: 'Информация о пользователе'},
         {command: '/game', description: 'Игра: "Угадай цифру"'},
+        {command: '/scan', description: 'Отсканируй файл'}
     ])
 
     bot.on('message', async msg => {
@@ -35,8 +38,9 @@ const start = () => {
         if (text === '/game') {
             return startGame(chatId)
         }
-
-        return bot.sendMessage(chatId, 'Я тебя не понимаю)')
+        if (text === '/scan') {
+            return bot.sendMessage(chatId, 'Пришлите мне изображение с текстом')
+        }
     })
 
     bot.on('callback_query', async msg => {
@@ -52,9 +56,34 @@ const start = () => {
         } else {
             return await bot.sendMessage(chatId, `Ты выбрал цифру ${data}, к сожалению ты не угадал, бот загадал другую цифру (${chats[chatId]}).`, againOptions)
         }
-
-
     })
+    bot.on('photo', async msg => {
+        const chatId = msg.chat.id;
+        const photo = msg.photo[msg.photo.length - 1];
+        const file = await bot.getFile(photo.file_id);
+        const filePath = file.file_path;
+        const url = `https://api.telegram.org/file/bot${token}/${filePath}`;
+
+        // Здесь сохраняем файл на диск
+        const imageResponse = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(imageResponse.data, 'binary');
+        fs.writeFileSync('image.jpg', buffer);
+
+        // Здесь распознаем текст с помощью tesseract.js
+        const { createWorker } = require('tesseract.js');
+        const worker = await createWorker();
+
+        await worker.load();
+        await worker.loadLanguage('eng');
+        await worker.initialize('eng');
+        const { data: { text } } = await worker.recognize('image.jpg');
+        await worker.terminate();
+
+        const wordCount = text.trim().split(/\s+/).length;
+        const charCount = text.replace(/\s/g, '').length;
+
+        return bot.sendMessage(chatId, `Количество символов с пробелами: ${charCount}, количество слов: ${wordCount}`);
+    });
 }
 
 start()
